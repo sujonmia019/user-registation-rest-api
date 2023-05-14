@@ -22,3 +22,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::get('users/{id?}', [UserController::class, 'index']);
 Route::post('add-user', [UserController::class, 'store']);
+Route::post('add-multi-user', [UserController::class, 'multiUser']);
+Route::put('user/{id}/update', [UserController::class, 'update']);
+Route::delete('user/delete/{id}', [UserController::class, 'delete']);
+Route::post('user/multi-delete', [UserController::class, 'multiDelete']);
