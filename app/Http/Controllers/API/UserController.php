@@ -4,8 +4,10 @@ namespace App\Http\Controllers\API;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
 use GuzzleHttp\Promise\Create;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
@@ -146,6 +148,77 @@ class UserController extends Controller
                 }else{
                     return response()->json(['message'=>'Authorization doesn\'t match!'],422);
                 }
+            }
+        }
+    }
+
+    public function register(Request $request){
+        if ($request->isMethod('post')) {
+            $data = $request->all();
+
+            // validate rules
+            $rules = [
+                'name'     => 'required|string',
+                'email'    => 'required|email|unique:users,email',
+                'password' => 'required|',
+            ];
+            // validate message
+            $message = [
+                'name.required'     => 'The name field is required.',
+                'email.required'    => 'The email field is required.',
+                'password.required' => 'The password field is required.'
+            ];
+
+            $validator = Validator::make($data,$rules,$message);
+            if ($validator->fails()) {
+                return response()->json(['error'=>$validator->errors()],422);
+            }else{
+                DB::beginTransaction();
+                try {
+                    User::create($data);
+                    if (Auth::attempt(['email' => $data['email'], 'password' => $data['password']])) {
+                        $user = User::where('email',$data['email'])->first();
+                        $access_token = $user->createToken($data['email'])->accessToken;
+                        $user->update(['access_token'=>$access_token]);
+                        DB::commit();
+                        return response()->json(['message'=>'User Successfull Registerd.','token'=>$access_token],200);
+                    }else{
+                        return response()->json(['message'=>'OPPS! Somthing went wrong.'],422);
+                    }
+
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    return response()->json(['error'=>$e->getMessage()],422);
+                }
+            }
+        }
+    }
+
+    public function login(Request $request){
+        $data = $request->only(['email','password']);
+        // validate rules
+        $rules = [
+            'email'    => 'required|email',
+            'password' => 'required|',
+        ];
+        // validate message
+        $message = [
+            'email.required'    => 'The email field is required.',
+            'password.required' => 'The password field is required.'
+        ];
+
+        $validator = Validator::make($data,$rules,$message);
+        if ($validator->fails()) {
+            return response()->json(['error'=>$validator->errors()],422);
+        }else{
+            if (Auth::attempt(['email'=>$data['email'],'password'=>$data['password']])) {
+                $user = User::where('email',$data['email'])->first();
+                $access_token = $user->createToken($data['email'])->accessToken;
+                $user->update(['access_token'=>$access_token]);
+
+                return response()->json(['message'=>'User Successfull Login.','token'=>$access_token],200);
+            }else{
+                return response()->json(['message'=>'Invalid email or password.'],422);
             }
         }
     }
